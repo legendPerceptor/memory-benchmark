@@ -1,0 +1,44 @@
+# Memory Benchmark Configuration
+# ==============================
+
+# Benchmark settings
+benchmark:
+  name: locomo
+  data_path: ../../memory-eval/locomo/data/locomo10.json
+  top_k: 10
+  granularity: session  # session or dialog
+
+# Memory systems to evaluate
+memory_systems:
+  mempalace:
+    enabled: true
+    mode: raw  # raw, hybrid, aaak, rooms, palace
+    embed_model: default  # default, BAAI/bge-large-en-v1.5
+    collection_name: locomo_test
+
+  ogmemory:
+    enabled: false
+    endpoint: http://localhost:8090
+    api_key: default
+    confidence_threshold: 0.5
+
+  memsearch:
+    enabled: false
+    embed_provider: onnx  # onnx, openai, google
+    collection: locomo_test
+
+# Evaluation settings
+evaluation:
+  metrics:
+    - recall_at_k
+    - ndcg_at_k
+    - mrr
+    - f1_score
+    - exact_match
+  top_k: [1, 5, 10]
+  include_performance: true
+
+# Output settings
+output:
+  formats: [markdown, json]
+  path: ../reports
