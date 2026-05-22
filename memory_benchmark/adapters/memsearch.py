@@ -15,7 +15,7 @@ memsearch_path = Path(__file__).parent.parent.parent.parent / "memsearch"
 sys.path.insert(0, str(memsearch_path))
 
 try:
-    from ..base import MemorySystemAdapter, RetrievalResult, IndexResult
+    from .base import MemorySystemAdapter, RetrievalResult, IndexResult
 except ImportError:
     from adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
 

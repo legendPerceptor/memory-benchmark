@@ -10,7 +10,7 @@ import json
 import time
 
 try:
-    from ..adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
+    from .adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
 except ImportError:
     from adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
 

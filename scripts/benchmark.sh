@@ -1,6 +1,6 @@
 #!/bin/bash
 # Memory Benchmark - One-click benchmark script
-# Usage: ./scripts/benchmark.sh [--system mempalace] [--benchmark locomo] [--top-k 10]
+# Usage: uv run python -m memory_benchmark --system mempalace --benchmark locomo
 
 set -e
 
@@ -18,7 +18,7 @@ MODE="raw"
 OUTPUT="reports"
 FORMAT="both"
 
-# 数据集路径
+# 数据集路径（默认指向 memory-eval 仓库）
 DATA_PATH="../../memory-eval/locomo/data/locomo10.json"
 
 # 解析参数
@@ -57,7 +57,8 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --help|-h)
-            echo "Usage: $0 [OPTIONS]"
+            echo "Usage: uv run python -m memory_benchmark [OPTIONS]"
+            echo "   or: $0 [OPTIONS]"
             echo ""
             echo "Options:"
             echo "  --system <name>     Memory system to test (mempalace,ogmemory,memsearch)"
@@ -71,7 +72,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --data <path>      Path to dataset"
             echo ""
             echo "Examples:"
-            echo "  $0 --system mempalace"
+            echo "  uv run python -m memory_benchmark --system mempalace"
             echo "  $0 --systems mempalace,ogmemory --top-k 5"
             echo "  $0 --system mempalace --mode hybrid --granularity dialog"
             exit 0
@@ -97,16 +98,15 @@ echo "  Mode: $MODE"
 echo "  Output: $OUTPUT"
 echo "========================================"
 
-# 运行 Python 脚本
-cd src
-python3 runner.py \
+# 使用 uv 运行
+uv run python -m memory_benchmark \
     --systems "$SYSTEMS" \
     --benchmark "$BENCHMARK" \
     --data "$DATA_PATH" \
     --top-k "$TOP_K" \
     --granularity "$GRANULARITY" \
     --mode "$MODE" \
-    --output "../$OUTPUT" \
+    --output "$OUTPUT" \
     --format "$FORMAT"
 
 echo ""

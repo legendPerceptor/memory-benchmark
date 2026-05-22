@@ -1,0 +1,63 @@
+{
+  "report_type": "memory_benchmark",
+  "generated_at": "2026-05-22T16:12:59.555915",
+  "benchmark": "LoCoMo",
+  "summary": {
+    "total_questions": 1986,
+    "systems_count": 1,
+    "total_time_ms": 403708.3957195282
+  },
+  "systems": {
+    "mempalace": {
+      "config": {
+        "name": "mempalace",
+        "mode": "raw",
+        "embed_model": "default",
+        "collection_name": "locomo_test",
+        "granularity": "session"
+      },
+      "metrics": {
+        "recall@1": 0.21419091710758378,
+        "recall@5": 0.4234008738175405,
+        "recall@10": 0.4234008738175405,
+        "ndcg@5": 0.3332561275775895,
+        "mrr": 0.32117003367003366,
+        "by_category": {
+          "Cat_2": {
+            "count": 317,
+            "recall@10": 0.5336487907465826
+          },
+          "Cat_3": {
+            "count": 96,
+            "recall@10": 0.2513020833333333
+          },
+          "Cat_1": {
+            "count": 280,
+            "recall@10": 0.3394359410430839
+          },
+          "Cat_4": {
+            "count": 841,
+            "recall@10": 0.42092746730083236
+          },
+          "Cat_5": {
+            "count": 446,
+            "recall@10": 0.43946188340807174
+          }
+        }
+      },
+      "performance": {
+        "index_time_ms": 6448.67730140686,
+        "avg_query_time_ms": 199.274632145631,
+        "median_query_time_ms": 199.9218463897705,
+        "p95_query_time_ms": 232.0995330810547,
+        "p99_query_time_ms": 259.9966526031494,
+        "std_query_time_ms": 18.349798352931646,
+        "avg_memory_mb": 0.0,
+        "peak_memory_mb": 0.0,
+        "total_queries": 1992,
+        "successful_queries": 1986,
+        "failed_queries": 6
+      }
+    }
+  }
+}

@@ -9,15 +9,15 @@ from collections import Counter
 
 from .base import Benchmark, QueryEntry, EvaluationResult
 try:
-    from ..adapters.base import MemorySystemAdapter, RetrievalResult
+    from .adapters.base import MemorySystemAdapter, RetrievalResult
 except ImportError:
     from adapters.base import MemorySystemAdapter, RetrievalResult
 try:
-    from ..metrics.retrieval import recall_at_k, ndcg_at_k, mrr
+    from .metrics.retrieval import recall_at_k, ndcg_at_k, mrr
 except ImportError:
     from metrics.retrieval import recall_at_k, ndcg_at_k, mrr
 try:
-    from ..metrics.qa import f1_score, exact_match
+    from .metrics.qa import f1_score, exact_match
 except ImportError:
     from metrics.qa import f1_score, exact_match
 

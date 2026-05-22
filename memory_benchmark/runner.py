@@ -11,18 +11,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-# 添加 src 路径
-sys.path.insert(0, str(Path(__file__).parent))
-
-from adapters.mempalace import MemPalaceAdapter
-from adapters.ogmemory import OGMemoryAdapter
-from adapters.memsearch import MemSearchAdapter
-from benchmarks.locomo import LoCoMoBenchmark
-from metrics.retrieval import recall_at_k, ndcg_at_k, mrr
-from metrics.qa import compute_qa_metrics
-from metrics.performance import PerformanceMonitor
-from reporters.json import generate_json_report
-from reporters.markdown import generate_markdown_report
+from .adapters.mempalace import MemPalaceAdapter
+from .adapters.ogmemory import OGMemoryAdapter
+from .adapters.memsearch import MemSearchAdapter
+from .benchmarks.locomo import LoCoMoBenchmark
+from .metrics.retrieval import recall_at_k, ndcg_at_k, mrr
+from .metrics.qa import compute_qa_metrics
+from .metrics.performance import PerformanceMonitor
+from .reporters.json import generate_json_report
+from .reporters.markdown import generate_markdown_report
 
 
 ADAPTER_REGISTRY = {

@@ -10,7 +10,7 @@ import urllib.error
 from typing import Optional
 
 try:
-    from ..base import MemorySystemAdapter, RetrievalResult, IndexResult
+    from .base import MemorySystemAdapter, RetrievalResult, IndexResult
 except ImportError:
     from adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
 

@@ -26,46 +26,61 @@
 
 ## 安装依赖
 
+使用 uv 管理虚拟环境和依赖：
+
 ```bash
-# 核心依赖
-pip install chromadb psutil pyyaml
+# 安装所有依赖
+uv sync --all
 
-# 可选：fastembed 用于自定义嵌入模型
-pip install fastembed
+# 或安装基本依赖
+uv sync
 
-# 可选：memsearch 相关依赖
-pip install pymilvus
+# 安装可选依赖
+uv sync --extra fastembed     # fastembed 嵌入模型
+uv sync --extra memsearch      # memsearch 支持
+uv sync --all-extras           # 所有可选依赖
+
+# 开发模式
+uv sync --all-extras --dev
 ```
 
 ## 快速开始
 
-### 1. 克隆仓库
+### 1. 克隆/进入仓库
 
 ```bash
-cd /home/yuanjian/Development/memory-projects/memory-systems
+cd /home/yuanjian/Development/memory-projects/memory-systems/memory-benchmark
 ```
 
-### 2. 运行基准测试
+### 2. 安装依赖
 
 ```bash
-cd memory-benchmark
+uv sync
+```
 
-# 运行 MemPalace 基准测试
+### 3. 运行基准测试
+
+```bash
+# 使用 uv 运行
+uv run python -m runner --system mempalace \
+    --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
+
+# 或使用脚本
 ./scripts/benchmark.sh --system mempalace \
     --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
 
 # 运行多系统对比
-./scripts/benchmark.sh --systems mempalace,ogmemory,memsearch \
+uv run python -m runner --systems mempalace,ogmemory,memsearch \
     --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
 
 # 指定参数
-./scripts/benchmark.sh --system mempalace \
+uv run python -m runner --system mempalace \
     --top-k 10 \
     --mode hybrid \
     --granularity session
 ```
 
-### 3. 查看报告
+### 4. 查看报告
 
 报告保存在 `reports/` 目录下：
 
@@ -134,29 +149,36 @@ generate_json_report(results, "report.json")
 
 ```
 memory-benchmark/
+├── pyproject.toml          # uv 依赖配置
+├── README.md               # 本文档
+├── .gitignore             # Git 忽略配置
 ├── config/
-│   └── config.yaml           # 配置文件
-├── src/
-│   ├── adapters/             # Memory 系统适配器
-│   │   ├── base.py          # 适配器基类
-│   │   ├── mempalace.py     # MemPalace 适配器
-│   │   ├── ogmemory.py      # oG-Memory 适配器
-│   │   └── memsearch.py     # memsearch 适配器
-│   ├── benchmarks/           # 基准测试模块
-│   │   ├── base.py          # 基准测试基类
-│   │   └── locomo.py        # LoCoMo 数据集适配器
-│   ├── metrics/              # 评估指标
-│   │   ├── retrieval.py     # R@K, NDCG@K, MRR
-│   │   ├── qa.py           # F1, EM, ROUGE-L
+│   └── config.yaml        # 配置文件
+├── src/                   # 源代码 (作为包使用)
+│   ├── __init__.py
+│   ├── adapters/          # Memory 系统适配器
+│   │   ├── __init__.py
+│   │   ├── base.py      # 适配器基类
+│   │   ├── mempalace.py # MemPalace 适配器
+│   │   ├── ogmemory.py  # oG-Memory 适配器
+│   │   └── memsearch.py # memsearch 适配器
+│   ├── benchmarks/       # 基准测试模块
+│   │   ├── __init__.py
+│   │   ├── base.py     # 基准测试基类
+│   │   └── locomo.py    # LoCoMo 数据集适配器
+│   ├── metrics/         # 评估指标
+│   │   ├── __init__.py
+│   │   ├── retrieval.py # R@K, NDCG@K, MRR
+│   │   ├── qa.py        # F1, EM, ROUGE-L
 │   │   └── performance.py # 性能指标
-│   ├── reporters/            # 报告生成器
-│   │   ├── json.py         # JSON 报告
-│   │   └── markdown.py     # Markdown 报告
-│   └── runner.py            # 统一入口
+│   ├── reporters/       # 报告生成器
+│   │   ├── __init__.py
+│   │   ├── json.py      # JSON 报告
+│   │   └── markdown.py  # Markdown 报告
+│   └── runner.py        # 统一入口 (CLI)
 ├── scripts/
-│   └── benchmark.sh          # 一键运行脚本
-├── reports/                   # 生成的报告
-└── README.md
+│   └── benchmark.sh     # 一键运行脚本
+└── reports/              # 生成的报告目录
 ```
 
 ## 添加新的 Memory 系统
