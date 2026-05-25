@@ -30,6 +30,7 @@ except ImportError:
 # ── 嵌入模型 ────────────────────────────────────────────────────────────────
 
 _fastembed_model = None
+_api_embedder = None
 
 
 def _get_embedder(model_name: str):
@@ -44,8 +45,92 @@ def _get_embedder(model_name: str):
     return _fastembed_model
 
 
-def _embed(texts: list, embed_model: str) -> Optional[list]:
-    """Embed a list of texts."""
+def _get_api_embedder(provider: str, model: str, api_key: str, base_url: str = None):
+    """Get API-based embedder (OpenAI-compatible or Volcengine)."""
+    global _api_embedder
+
+    # Check if we can reuse cached embedder with same config
+    cache_key = (provider, model, api_key, base_url)
+    if _api_embedder and getattr(_api_embedder, '_cache_key', None) == cache_key:
+        return _api_embedder
+
+    try:
+        from openai import AsyncOpenAI
+    except ImportError:
+        raise ImportError("openai not installed — pip install openai")
+
+    # Build base_url for API call
+    if provider == "volcengine":
+        if base_url:
+            emb_base_url = base_url
+        else:
+            emb_base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
+    elif base_url:
+        emb_base_url = base_url
+    else:
+        emb_base_url = "https://api.openai.com/v1"
+
+    client_kwargs = {"api_key": api_key, "base_url": emb_base_url}
+    sync_client = AsyncOpenAI(**client_kwargs)
+
+    class APIEmbedder:
+        """Wrapper for API-based embedding."""
+        _cache_key = cache_key
+
+        def __init__(self, model_name: str, dimension: int = 1024):
+            self.model = model_name
+            self.dimension = dimension
+
+        def embed(self, texts: list) -> list:
+            """Embed texts synchronously."""
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            future = self._embed_async(texts)
+            return loop.run_until_complete(future)
+
+        async def _embed_async(self, texts: list) -> list:
+            resp = await sync_client.embeddings.create(
+                input=texts,
+                model=self.model,
+                encoding_format="float"
+            )
+            return [item.embedding for item in resp.data]
+
+    # Detect dimension for common models
+    dimension_map = {
+        "text-embedding-3-small": 1536,
+        "text-embedding-3-large": 3072,
+        "text-embedding-ada-002": 1536,
+    }
+    dimension = dimension_map.get(model, 1024)
+
+    _api_embedder = APIEmbedder(model, dimension)
+    return _api_embedder
+
+
+def _embed(texts: list, embed_model: str, embed_provider: str = None, api_key: str = None, embed_base_url: str = None) -> Optional[list]:
+    """Embed a list of texts.
+
+    Args:
+        texts: List of texts to embed
+        embed_model: Model name (used for API or local)
+        embed_provider: Provider type ("openai", "volcengine", or None for local)
+        api_key: API key for remote embedding
+        embed_base_url: Custom API base URL
+    """
+    # Use API embedding if provider is specified
+    if embed_provider and embed_provider != "onnx":
+        if not api_key:
+            raise ValueError(f"API key required for embed_provider={embed_provider}")
+        embedder = _get_api_embedder(embed_provider, embed_model, api_key, embed_base_url)
+        return [vec for vec in embedder.embed(texts)]
+
+    # Use local fastembed (default behavior)
     if not embed_model or embed_model == "default":
         return None
     embedder = _get_embedder(embed_model)
@@ -92,6 +177,9 @@ class MemPalaceAdapter(MemorySystemAdapter):
         self,
         mode: str = "raw",
         embed_model: str = "default",
+        embed_provider: str = None,
+        embed_base_url: str = None,
+        api_key: str = None,
         collection_name: str = "locomo_test",
         granularity: str = "session",
     ):
@@ -100,11 +188,17 @@ class MemPalaceAdapter(MemorySystemAdapter):
         Args:
             mode: 检索模式 (raw/hybrid/aaak/rooms/palace)
             embed_model: 嵌入模型名称
+            embed_provider: 嵌入提供商 (openai, volcengine, onnx)
+            embed_base_url: 自定义 API base URL
+            api_key: API 密钥
             collection_name: ChromaDB collection 名称
             granularity: 语料粒度 (session/dialog)
         """
         self.mode = mode
         self.embed_model = embed_model
+        self.embed_provider = embed_provider
+        self.embed_base_url = embed_base_url
+        self.api_key = api_key
         self.collection_name = collection_name
         self.granularity = granularity
 
@@ -164,9 +258,15 @@ class MemPalaceAdapter(MemorySystemAdapter):
             metadatas=metadatas,
         )
 
-        # 可选：预计算嵌入
-        if self.embed_model != "default":
-            embeddings = _embed(documents, self.embed_model)
+        # 可选：预计算嵌入（API 或本地）
+        if self.embed_model != "default" or self.embed_provider:
+            embeddings = _embed(
+                documents,
+                self.embed_model,
+                self.embed_provider,
+                self.api_key,
+                self.embed_base_url,
+            )
             if embeddings:
                 # 重新添加（使用嵌入）
                 self._collection.delete()
@@ -202,7 +302,13 @@ class MemPalaceAdapter(MemorySystemAdapter):
             raise ValueError("Collection not initialized. Call index() first.")
 
         # 准备查询
-        q_emb = _embed([query], self.embed_model)
+        q_emb = _embed(
+            [query],
+            self.embed_model,
+            self.embed_provider,
+            self.api_key,
+            self.embed_base_url,
+        )
         kwargs = dict(
             n_results=top_k,
             include=["distances", "metadatas", "documents"],
@@ -296,6 +402,8 @@ class MemPalaceAdapter(MemorySystemAdapter):
             "name": self.name,
             "mode": self.mode,
             "embed_model": self.embed_model,
+            "embed_provider": self.embed_provider,
+            "embed_base_url": self.embed_base_url,
             "collection_name": self.collection_name,
             "granularity": self.granularity,
         }

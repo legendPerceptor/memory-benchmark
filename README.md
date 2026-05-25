@@ -104,8 +104,109 @@ cat reports/locomo_benchmark_*.md
 | `--top-k` | 检索返回结果数量 | 10 |
 | `--granularity` | 语料粒度 (session/dialog) | session |
 | `--mode` | 检索模式 | raw |
+| `--embed-model` | Embedding 模型名称 | default |
+| `--embed-provider` | Embedding 提供商 (openai/volcengine/onnx) | openai |
+| `--embed-base-url` | 自定义 API base URL | - |
+| `--api-key` | API 密钥 | - |
+| `--endpoint` | oG-Memory API 端点 | http://localhost:8090 |
 | `--output` | 输出目录 | reports |
 | `--format` | 输出格式 (json/markdown/both) | both |
+
+## API Embedding 配置
+
+默认使用 API 调用进行 embedding，支持多种云服务。
+
+### 环境变量方式（推荐）
+
+```bash
+# 设置 API Key
+export OPENAI_API_KEY="your-key-here"
+
+# 运行基准测试
+python -m memory_benchmark --systems mempalace --embed-provider openai --embed-model text-embedding-3-small
+```
+
+### 命令行参数方式
+
+```bash
+# 使用 OpenAI
+python -m memory_benchmark \
+  --systems mempalace \
+  --api-key "your-openai-key" \
+  --embed-provider openai \
+  --embed-model text-embedding-3-small
+
+# 使用火山引擎
+python -m memory_benchmark \
+  --systems mempalace \
+  --api-key "your-volc-key" \
+  --embed-provider volcengine \
+  --embed-model doubao-embedding-vision-250615
+
+# 使用自定义 API（OpenAI 兼容）
+python -m memory_benchmark \
+  --systems mempalace \
+  --api-key "your-api-key" \
+  --embed-provider openai \
+  --embed-base-url "https://your-custom-api.com/v1" \
+  --embed-model "your-model-name"
+```
+
+### 各系统配置示例
+
+#### MemPalace（ChromaDB + API Embedding）
+
+```bash
+python -m memory_benchmark \
+  --systems mempalace \
+  --api-key "$OPENAI_API_KEY" \
+  --embed-provider openai \
+  --embed-model text-embedding-3-small \
+  --mode hybrid
+```
+
+#### MemSearch（Milvus + API Embedding）
+
+```bash
+python -m memory_benchmark \
+  --systems memsearch \
+  --api-key "$OPENAI_API_KEY" \
+  --embed-provider openai
+```
+
+#### oG-Memory（HTTP API）
+
+```bash
+python -m memory_benchmark \
+  --systems ogmemory \
+  --api-key "your-ogmemory-key" \
+  --endpoint http://localhost:8090
+```
+
+### 支持的 Embedding 提供商
+
+| 提供商 | 模型示例 | 说明 |
+|--------|----------|------|
+| `openai` | text-embedding-3-small, text-embedding-3-large | OpenAI API |
+| `volcengine` | doubao-embedding-vision-250615 | 火山引擎 API |
+| `onnx` | BAAI/bge-m3 | 本地 ONNX 模型（无需 API key） |
+| `google` | gemini-embedding-001 | Google AI |
+| `jina` | jina-embeddings-v4 | Jina AI |
+| `mistral` | mistral-embed | Mistral AI |
+| `voyage` | voyage-3-lite | Voyage AI |
+| `ollama` | nomic-embed-text | Ollama 本地模型 |
+
+### 本地模型（无需 API Key）
+
+如果不提供 API key，可以使用本地模型：
+
+```bash
+# 使用 ONNX 本地模型
+python -m memory_benchmark \
+  --systems mempalace \
+  --embed-provider onnx \
+  --embed-model BAAI/bge-m3
+```
 
 ## Python API
 

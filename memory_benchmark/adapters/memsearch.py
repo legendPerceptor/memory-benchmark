@@ -32,6 +32,8 @@ class MemSearchAdapter(MemorySystemAdapter):
         self,
         embed_provider: str = "onnx",
         embed_model: str = "BAAI/bge-m3",
+        embed_base_url: str = None,
+        api_key: str = None,
         collection: str = "locomo_test",
         top_k: int = 10,
     ):
@@ -40,11 +42,15 @@ class MemSearchAdapter(MemorySystemAdapter):
         Args:
             embed_provider: 嵌入提供者 (onnx/openai/google/etc.)
             embed_model: 嵌入模型名称
+            embed_base_url: 自定义 API base URL
+            api_key: API 密钥
             collection: Milvus collection 名称
             top_k: 默认返回结果数量
         """
         self.embed_provider = embed_provider
         self.embed_model = embed_model
+        self.embed_base_url = embed_base_url
+        self.api_key = api_key
         self.collection = collection
         self.default_top_k = top_k
 
@@ -74,6 +80,8 @@ class MemSearchAdapter(MemorySystemAdapter):
             paths=[self._temp_dir],
             embedding_provider=self.embed_provider,
             embedding_model=self.embed_model,
+            embedding_base_url=self.embed_base_url,
+            embedding_api_key=self.api_key,
             collection=self.collection,
         )
 
@@ -196,5 +204,6 @@ class MemSearchAdapter(MemorySystemAdapter):
             "name": self.name,
             "embed_provider": self.embed_provider,
             "embed_model": self.embed_model,
+            "embed_base_url": self.embed_base_url,
             "collection": self.collection,
         }

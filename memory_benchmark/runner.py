@@ -107,6 +107,27 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--api-key",
+        type=str,
+        default=None,
+        help="API key for remote services (OGMemory, OpenAI, etc.)",
+    )
+
+    parser.add_argument(
+        "--embed-provider",
+        type=str,
+        default="openai",
+        help="Embedding provider (openai, volcengine, onnx)",
+    )
+
+    parser.add_argument(
+        "--embed-base-url",
+        type=str,
+        default=None,
+        help="Custom embedding API base URL (for OpenAI-compatible APIs)",
+    )
+
+    parser.add_argument(
         "--format",
         type=str,
         default="both",
@@ -145,15 +166,22 @@ def create_adapter(
         return MemPalaceAdapter(
             mode=args.mode,
             embed_model=args.embed_model,
+            embed_provider=args.embed_provider,
+            embed_base_url=args.embed_base_url,
+            api_key=args.api_key,
             granularity=args.granularity,
         )
     elif system_name == "ogmemory":
         return OGMemoryAdapter(
             endpoint=args.endpoint,
+            api_key=args.api_key or "default",
         )
     elif system_name == "memsearch":
         return MemSearchAdapter(
-            embed_provider="onnx",
+            embed_provider=args.embed_provider,
+            embed_model=args.embed_model,
+            embed_base_url=args.embed_base_url,
+            api_key=args.api_key,
         )
     else:
         print(f"Unknown system: {system_name}")
