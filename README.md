@@ -109,8 +109,35 @@ cat reports/locomo_benchmark_*.md
 | `--embed-base-url` | 自定义 API base URL | - |
 | `--api-key` | API 密钥 | - |
 | `--endpoint` | oG-Memory API 端点 | http://localhost:8090 |
+| `--llm-model` | LLM 模型名称 | gpt-4o-mini |
+| `--llm-api-key` | LLM API 密钥 | - |
+| `--llm-base-url` | 自定义 LLM API URL | - |
+| `--generation-mode` | 启用生成模式（检索+LLM生成答案） | false |
 | `--output` | 输出目录 | reports |
 | `--format` | 输出格式 (json/markdown/both) | both |
+
+## 评测模式
+
+### 纯检索模式（默认）
+
+只测试记忆系统的检索能力，评估检索结果与 ground truth 的重叠度：
+
+```
+问题 → 记忆系统检索 → 检索结果 → 评估检索指标（R@K, NDCG）
+```
+
+### 生成模式（`--generation-mode`）
+
+测试完整流程：检索上下文 + LLM 推理生成答案 + 评估生成质量：
+
+```
+问题 → 记忆系统检索上下文 → LLM 生成答案 → 评估生成指标（F1, EM）
+```
+
+适用场景：
+- 测试"记忆检索 + 推理生成"综合能力
+- 对比不同记忆系统在实际 Agent 场景下的表现
+- 评估检索质量对最终生成效果的影响
 
 ## API Embedding 配置
 
@@ -245,6 +272,112 @@ for query in queries:
 generate_markdown_report(results, "report.md")
 generate_json_report(results, "report.json")
 ```
+
+## oG-Memory 完整评测示例
+
+使用 oG-Memory 测试 LoCoMo 完整流程（检索 + 生成）：
+
+### 纯检索模式
+
+```bash
+# 启动 oG-Memory 服务（后台）
+cd /home/yuanjian/Development/memory-projects/memory-systems/oG-Memory
+gunicorn -w 2 -b 0.0.0.0:8090 server.app:app &
+
+# 运行检索评测
+python -m memory_benchmark \
+  --systems ogmemory \
+  --endpoint http://localhost:8090 \
+  --api-key "your-ogmemory-key" \
+  --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
+```
+
+### 生成模式（检索 + LLM 生成答案）
+
+```bash
+# 使用 OpenAI LLM 生成答案
+python -m memory_benchmark \
+  --systems ogmemory \
+  --endpoint http://localhost:8090 \
+  --api-key "your-ogmemory-key" \
+  --llm-api-key "your-openai-key" \
+  --llm-model gpt-4o-mini \
+  --generation-mode \
+  --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
+
+# 使用火山引擎 LLM
+python -m memory_benchmark \
+  --systems ogmemory \
+  --endpoint http://localhost:8090 \
+  --api-key "your-ogmemory-key" \
+  --llm-api-key "your-volc-key" \
+  --llm-model doubao-pro-32k \
+  --llm-base-url "https://ark.cn-beijing.volces.com/api/coding/v3" \
+  --generation-mode \
+  --data /home/yuanjian/Development/memory-projects/memory-eval/locomo/data/locomo10.json
+```
+
+### 生成模式评测流程
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          LoCoMo Generation Mode                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. Index Phase (每个 sample 的对话)                                          │
+│     ┌─────────────────────────────────────────────────────────────────┐       │
+│     │ session_1: "Caroline said..."                                   │       │
+│     │ session_2: "Melanie said..."                                  │       │
+│     │ ...                                                            │       │
+│     │ session_N: "When did Caroline go to the LGBTQ support group?" │       │
+│     └─────────────────────────────────────────────────────────────────┘       │
+│                                     │                                         │
+│                                     ▼                                         │
+│                          oG-Memory after_turn API                            │
+│                          (提取记忆、生成 summaries)                            │
+│                                                                              │
+│  2. Query Phase (每个 QA 对)                                                  │
+│     ┌─────────────────────────────────────────────────────────────────┐       │
+│     │ Question: "When did Caroline go to the LGBTQ support group?"     │       │
+│     └─────────────────────────────────────────────────────────────────┘       │
+│                                     │                                         │
+│                                     ▼                                         │
+│     ┌─────────────────────────────────────────────────────────────────┐       │
+│     │ compose API → 检索记忆上下文                                  │       │
+│     │   - identityContext: "Caroline is a transgender woman..."     │       │
+│     │   - episodicContext: (历史会话摘要)                            │       │
+│     │   - retrievedEvidence: "D1:3: Caroline went to LGBTQ on 7 May"│       │
+│     └─────────────────────────────────────────────────────────────────┘       │
+│                                     │                                         │
+│                                     ▼                                         │
+│     ┌─────────────────────────────────────────────────────────────────┐       │
+│     │ LLM Generate Answer (context + question → answer)             │       │
+│     │   Answer: "7 May 2023"                                        │       │
+│     └─────────────────────────────────────────────────────────────────┘       │
+│                                     │                                         │
+│                                     ▼                                         │
+│                          评估生成质量 vs Ground Truth                         │
+│                          (F1, Exact Match, ROUGE-L)                          │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+## LLM 配置说明
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `--llm-model` | LLM 模型名称 | gpt-4o-mini, doubao-pro-32k |
+| `--llm-api-key` | LLM API 密钥 | sk-xxx |
+| `--llm-base-url` | 自定义 LLM API URL | https://api.openai.com/v1 |
+
+常用配置组合：
+
+| LLM 提供商 | 模型 | Base URL |
+|-----------|------|----------|
+| OpenAI | gpt-4o-mini, gpt-4o | https://api.openai.com/v1 |
+| 火山引擎 | doubao-pro-32k, doubao-lite | https://ark.cn-beijing.volces.com/api/coding/v3 |
+| Azure OpenAI | gpt-4o-mini | https://xxx.openai.azure.com |
+| 自定义 | 自定义模型 | https://your-vllm-server.com/v1 |
 
 ## 项目结构
 

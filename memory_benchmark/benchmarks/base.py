@@ -8,11 +8,16 @@ from dataclasses import dataclass, field
 from typing import Any
 import json
 import time
+import sys
+from pathlib import Path
 
-try:
-    from .adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
-except ImportError:
-    from adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
+# 处理导入路径：支持作为包和直接运行两种方式
+_benchmark_dir = Path(__file__).parent
+_memory_benchmark_dir = _benchmark_dir.parent
+if str(_memory_benchmark_dir) not in sys.path:
+    sys.path.insert(0, str(_memory_benchmark_dir))
+
+from adapters.base import MemorySystemAdapter, RetrievalResult, IndexResult
 
 
 @dataclass

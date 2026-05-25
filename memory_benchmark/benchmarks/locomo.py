@@ -181,37 +181,88 @@ class LoCoMoBenchmark(Benchmark):
     def prepare_corpus(self) -> list[dict]:
         """准备要索引的语料
 
-        将 LoCoMo 对话转换为文档列表
+        将 LoCoMo 对话转换为文档列表。
+        注意：对于 oG-Memory，应该输出原始对话结构，让它按时间顺序逐轮写入。
+
+        Returns:
+            语料列表 [{id, text, metadata}]
+                   - id: 样本 ID
+                   - text: JSON 格式的对话结构
+                   - metadata: 样本元信息
+        """
+        import json
+
+        corpus = []
+
+        for sample in self.data:
+            sample_id = sample["sample_id"]
+            conversation = sample["conversation"]
+
+            # 输出完整的 conversation 结构（JSON 字符串）
+            # 这样 oG-Memory 适配器可以按时间顺序逐轮写入
+            conversation_json = json.dumps(conversation, ensure_ascii=False)
+
+            corpus.append({
+                "id": sample_id,
+                "text": conversation_json,
+                "metadata": {
+                    "sample_id": sample_id,
+                    "session_count": len([k for k in conversation.keys() if k.startswith("session_")]),
+                }
+            })
+
+        return corpus
+
+    def prepare_corpus_by_session(self) -> list[dict]:
+        """按 session 准备语料（替代方法）
+
+        每个 sample 的每个 session 作为一个文档。
+        用于测试按 session 粒度的索引。
 
         Returns:
             语料列表 [{id, text, metadata}]
         """
+        import json
+
         corpus = []
 
         for sample in self.data:
+            sample_id = sample["sample_id"]
             conversation = sample["conversation"]
-            session_summaries = sample.get("session_summary", {})
 
-            sessions = load_conversation_sessions(conversation, session_summaries)
-            texts, ids, timestamps = build_corpus_from_sessions(sessions, self.granularity)
+            # 找出所有 session
+            session_keys = sorted([
+                k for k in conversation.keys()
+                if k.startswith("session_") and not k.endswith("_date_time")
+            ])
 
-            for i, (text, doc_id, timestamp) in enumerate(zip(texts, ids, timestamps)):
-                # 添加样本前缀以避免不同样本间的 ID 冲突
-                full_id = f"{sample['sample_id']}_{doc_id}"
+            for session_key in session_keys:
+                session_dialogs = conversation.get(session_key, [])
+                session_date = conversation.get(f"{session_key}_date_time", "")
+
+                # 提取 session 编号
+                session_num = session_key.split("_")[1]
+
+                # 构建 session 对话列表
+                session_data = {
+                    session_key: session_dialogs,
+                    f"{session_key}_date_time": session_date,
+                }
+
                 corpus.append({
-                    "id": full_id,
-                    "text": text,
+                    "id": f"{sample_id}_{session_key}",
+                    "text": json.dumps(session_data, ensure_ascii=False),
                     "metadata": {
-                        "sample_id": sample["sample_id"],
-                        "session": doc_id,
-                        "date": timestamp,
+                        "sample_id": sample_id,
+                        "session_num": session_num,
+                        "date": session_date,
+                        "dialog_count": len(session_dialogs),
                     }
                 })
 
-                if self.granularity == "session":
-                    # 记录用于后续映射
-                    self._corpus_ids.append(full_id)
-                    self._corpus_timestamps.append(timestamp)
+                # 记录用于后续映射
+                self._corpus_ids.append(f"{sample_id}_{session_key}")
+                self._corpus_timestamps.append(session_date)
 
         return corpus
 

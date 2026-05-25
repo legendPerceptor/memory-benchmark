@@ -54,3 +54,5 @@ milvus.db
 Thumbs.db
 
 uv.lock
+
+.memsearch/

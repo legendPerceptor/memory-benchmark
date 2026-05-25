@@ -128,6 +128,33 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--llm-model",
+        type=str,
+        default="gpt-4o-mini",
+        help="LLM model for answer generation (used in generation mode)",
+    )
+
+    parser.add_argument(
+        "--llm-api-key",
+        type=str,
+        default=None,
+        help="API key for LLM (if different from embedding API key)",
+    )
+
+    parser.add_argument(
+        "--llm-base-url",
+        type=str,
+        default=None,
+        help="Custom LLM API base URL (for OpenAI-compatible APIs)",
+    )
+
+    parser.add_argument(
+        "--generation-mode",
+        action="store_true",
+        help="Enable generation mode: retrieve context then generate answer with LLM",
+    )
+
+    parser.add_argument(
         "--format",
         type=str,
         default="both",
@@ -175,6 +202,10 @@ def create_adapter(
         return OGMemoryAdapter(
             endpoint=args.endpoint,
             api_key=args.api_key or "default",
+            llm_model=args.llm_model,
+            llm_api_key=args.llm_api_key,
+            llm_base_url=args.llm_base_url,
+            generation_mode=args.generation_mode,
         )
     elif system_name == "memsearch":
         return MemSearchAdapter(
@@ -194,6 +225,7 @@ def run_benchmark(
     data_path: str,
     top_k: int,
     granularity: str,
+    generation_mode: bool = False,
 ) -> dict:
     """运行单个系统的基准测试
 
@@ -203,12 +235,15 @@ def run_benchmark(
         data_path: 数据集路径
         top_k: 检索结果数量
         granularity: 语料粒度
+        generation_mode: 是否启用生成模式（检索+LLM生成）
 
     Returns:
         测试结果字典
     """
     print(f"\n{'='*60}")
     print(f"  Running {system_name} on LoCoMo")
+    if generation_mode:
+        print(f"  [Generation Mode: Enabled]")
     print(f"{'='*60}")
 
     # 初始化基准测试
@@ -236,6 +271,8 @@ def run_benchmark(
     # 准备查询
     queries = benchmark.prepare_queries()
     print(f"  Running {len(queries)} queries...")
+    if generation_mode:
+        print(f"  (Using generation mode: retrieve context + generate answer with LLM)")
 
     # 性能监控
     monitor = PerformanceMonitor()
@@ -246,13 +283,37 @@ def run_benchmark(
     for i, query in enumerate(queries):
         query_start = time.time()
         try:
-            retrieved = adapter.search(query.question, top_k)
-            query_time_ms = (time.time() - query_start) * 1000
-            monitor.record_query_time(query_time_ms)
+            # 检查是否支持生成模式
+            if generation_mode and hasattr(adapter, 'query_with_generation'):
+                gen_result = adapter.query_with_generation(query.question, top_k)
+                retrieved = gen_result["retrieval_results"]
+                generated_answer = gen_result.get("generated_answer", "")
+                query_time_ms = (time.time() - query_start) * 1000
+                monitor.record_query_time(query_time_ms)
 
-            eval_result = benchmark.evaluate_query(query, top_k, retrieved)
-            eval_result.query_time_ms = query_time_ms
-            results.append(eval_result)
+                # 评估检索结果
+                eval_result = benchmark.evaluate_query(query, top_k, retrieved)
+                eval_result.query_time_ms = query_time_ms
+
+                # 如果有生成答案，添加 QA 指标
+                if generated_answer:
+                    # 使用 metrics.qa 模块计算生成答案的质量
+                    from .metrics.qa import compute_qa_metrics
+                    qa_metrics = compute_qa_metrics(generated_answer, query.answer)
+                    eval_result.qa_metrics = qa_metrics
+                    # 将生成答案存入 metadata 以便报告输出
+                    eval_result.metadata["generated_answer"] = generated_answer
+
+                results.append(eval_result)
+            else:
+                # 纯检索模式
+                retrieved = adapter.search(query.question, top_k)
+                query_time_ms = (time.time() - query_start) * 1000
+                monitor.record_query_time(query_time_ms)
+
+                eval_result = benchmark.evaluate_query(query, top_k, retrieved)
+                eval_result.query_time_ms = query_time_ms
+                results.append(eval_result)
         except Exception as e:
             query_time_ms = (time.time() - query_start) * 1000
             monitor.record_error(str(e))
@@ -385,6 +446,7 @@ def main():
             data_path=args.data,
             top_k=args.top_k,
             granularity=args.granularity,
+            generation_mode=args.generation_mode,
         )
 
         all_results["systems"][system_name] = system_results
